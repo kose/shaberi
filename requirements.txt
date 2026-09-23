@@ -8,3 +8,7 @@ seaborn
 rich
 tabulate
 textual
+
+# google-genai
+openai
+ollama
