@@ -70,7 +70,7 @@ def evaluate(model_name: str, eval_dataset_name: str, evaluation_model: str, num
         print(f"Skipping {model_name} on {eval_dataset_name} (existing judgement found at {output_path}; use --rerun to overwrite)")
         return
 
-    ans_dataset.to_json(output_path)
+    ans_dataset.to_json(output_path, force_ascii=False)
 
 
 def run_judgement(model_name: str, eval_dataset_name: str = "all", evaluation_model: str = "gpt-4.1-2025-04-14", num_proc: int = 8, rerun: bool = False):

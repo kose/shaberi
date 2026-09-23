@@ -84,6 +84,40 @@ def get_response_from_openai(messages: list, model_name: str) -> str:
     return response.choices[0].message.content
 
 
+@backoff.on_exception(backoff.fibo, Exception, max_tries=10)
+def get_response_from_ollama(
+    messages: list, model_name: str
+) -> str:
+    OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "localhost")
+    base_url = f"http://{OLLAMA_HOST}:11434/v1"
+    client = OpenAI(base_url=base_url, api_key="ollama")
+    
+    try:
+        response = client.chat.completions.create(
+            messages=messages,
+            model=model_name,
+            temperature=0,
+            max_tokens=8192,  # 思考モデル用にトークン数を増やす
+        )
+
+        message = response.choices[0].message
+        content = message.content
+
+        # content が空で reasoning が入っている場合の救済処理
+        if not content and hasattr(message, "reasoning") and message.reasoning:
+            content = message.reasoning
+
+        if not content:
+            raise RuntimeError(
+                "モデルからの出力（content / reasoning）が空でした。"
+            )
+
+        return content
+
+    except OpenAIError as e:
+        raise RuntimeError(f"Ollama API エラーが発生しました: {str(e)}") from None
+
+
 @backoff.on_exception(backoff.fibo, Exception, max_tries=1000)
 def get_response_from_gemini_native(messages: list, model_name: str) -> str:
     if not GEMINI_AVAILABLE:
@@ -163,6 +197,10 @@ def get_response_from_llmjudge(messages: list, model_name: str) -> str:
 
 
 def get_response_func(model_name: str) -> callable:
+
+    if os.getenv("OLLAMA_HOST"):
+        return get_response_from_ollama
+
     lower_name = model_name.lower()
     if "gemini" in lower_name:
         if os.environ.get("GEMINI_NATIVE") == "1":
@@ -187,6 +225,11 @@ def get_model_response(messages: list, model_name: str) -> str:
 # === 回答生成関数群 ===
 @backoff.on_exception(backoff.fibo, Exception, max_tries=10)
 def get_answer(question: str, model_name: str):
+
+    if x := os.getenv("OLLAMA_HOST"):
+        os.environ["OPENAI_API_KEY"] = "ollama dummy key"
+        os.environ["OPENAI_BASE_URL"] = f"http://{x}:11434/v1"
+
     try:
         api_key = os.environ.get("OPENAI_API_KEY", "EMPTY")
 
